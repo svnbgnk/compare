@@ -1,0 +1,5 @@
+readid	prob	DNA
+0	0.23	ACGT
+1	0.1	ACGT
+2	0.999	ACGG
+3	0.01	ACGG
