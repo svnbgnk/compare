@@ -28,8 +28,11 @@ int main(int argc, char const * argv[])
 
     addOption(parser, ArgParseOption("o", "output", "Path to fasta output file", ArgParseArgument::OUTPUT_FILE, "OUT"));
     setRequired(parser, "output");
+    
+    addOption(parser, ArgParseOption("p", "first", "First p reads", ArgParseArgument::INTEGER, "INT"));
+    hideOption(getOption(parser, "first"));
 
-    addOption(parser, ArgParseOption("mt", "threshold", "Number of matches required to start or end cDNA part", ArgParseArgument::INTEGER, "INT"));
+    addOption(parser, ArgParseOption("mt", "threshold", "Number of matches required to define start or end of the cDNA part", ArgParseArgument::INTEGER, "INT"));
     
     addOption(parser, ArgParseOption("v", "verbose", ""));
 
@@ -42,10 +45,12 @@ int main(int argc, char const * argv[])
     
     int barcode_umi_length = 30;
     int threshold = 5;
+    int first = 9999999;
 
     getOptionValue(bamPath, parser, "bam");
     getOptionValue(outputPath, parser, "output");
 //     getOptionValue(barcodeLength, parser, "barcodeL");
+    getOptionValue(first, parser, "first");
     getOptionValue(threshold, parser, "threshold");
     bool verbose = isSet(parser, "verbose");
 
@@ -75,8 +80,12 @@ int main(int argc, char const * argv[])
     Dna5String best_end2;
     bool start = true;
     
+    
+    int y = 0; 
     while (!atEnd(bamFileIn))
     {
+        ++y;
+
         try
         {
             readRecord(record, bamFileIn);
@@ -86,6 +95,9 @@ int main(int argc, char const * argv[])
             std::cerr << "ERROR: could not copy record. " << e.what() << "\n";
             continue;
         }
+        
+        if (y > first)
+            continue;
             
             Dna5String end1 = record.seq;
             Dna5String end2 = record.seq;
@@ -96,10 +108,19 @@ int main(int argc, char const * argv[])
                 start = false;
             }
             
+                        
+            if(length(record.seq) == 0){
+                std::cout << toCString(id) << "\n";
+                std::cout << "Read could not be loaded\n";
+                continue;
+            }
+            
             if(verbose){
                 std::cout << "Accession in Bam " << toCString(id) << "\n";
-                std::cout << "Read length: " << length(end1) /*<< ": " << record.seq*/ << "\n";
+                std::cout << "Read length: " << length(record.seq) << ": " << record.seq << "\n";
             }
+            
+
             
             String<CigarElement<> > cigar = record.cigar;
             //take front
@@ -124,45 +145,49 @@ int main(int argc, char const * argv[])
                 if(cigar[i].operation == op_match || cigar[i].operation == op_soft || cigar[i].operation == op_del)
                     pos += cigar[i].count;
             }
+            
+            int score = 0;
+
+            
             if(!found){
                 std::cout << "Take whole read since it was not aligned\n";
                 writeRecord(seqFileOut, id, end2);
                 continue;
             }
                 
-//             std::cout << "final Match count: " << match_count << " found: " << found << "\n";
-//             std::cout << "Cut end" << "\n";
-            pos = 0;
-            int match_count2 = 0;
-            bool found2 = false;
-            for(int i = length(cigar) - 1; i >= 0 ; --i){
-//                 std::cout << "C: " << cigar[i].count << cigar[i].operation << "\n";
-//                 std::cout << pos << "\n";
-                if (cigar[i].operation == op_match)
-                    match_count2 += cigar[i].count;
-                
-                if (match_count2 > threshold){
-//                     std::cout << "found pos: " << pos << "\n";
-                    end2 = suffix(end2, length(end2) - pos - 1);
-                    found2 = true;
-                    break;
+    //             std::cout << "final Match count: " << match_count << " found: " << found << "\n";
+    //             std::cout << "Cut end" << "\n";
+                pos = 0;
+                int match_count2 = 0;
+                bool found2 = false;
+                for(int i = length(cigar) - 1; i >= 0 ; --i){
+    //                 std::cout << "C: " << cigar[i].count << cigar[i].operation << "\n";
+    //                 std::cout << pos << "\n";
+                    if (cigar[i].operation == op_match)
+                        match_count2 += cigar[i].count;
+                    
+                    if (match_count2 > threshold){
+    //                     std::cout << "found pos: " << pos << "\n";
+                        end2 = suffix(end2, length(end2) - pos - 1);
+                        found2 = true;
+                        break;
+                    }
+                    
+                    if(cigar[i].operation == op_match || cigar[i].operation == op_soft || cigar[i].operation == op_del)
+                        pos += cigar[i].count;
                 }
                 
-                if(cigar[i].operation == op_match || cigar[i].operation == op_soft || cigar[i].operation == op_del)
-                    pos += cigar[i].count;
-            }
-            
-            if(verbose){
-                std::cout << "lenght end1: " << length(end1) << "\tScore: " << match_count << "\n";
+                if(verbose){
+                    std::cout << "lenght end1: " << length(end1) << "\tScore: " << match_count << "\n";
+                    
+                    std::cout << "lenght end2: " << length(end2) << "\tScore: " << match_count2 << "\n";
+                    
+                    std::cout << "Score: " << (match_count + match_count2) << "\n";
+                }
                 
-                std::cout << "lenght end2: " << length(end2) << "\tScore: " << match_count2 << "\n";
                 
-                std::cout << "Score: " << (match_count + match_count2) << "\n";
-            }
+                score = match_count + match_count2;
             
-            
-        int score = match_count + match_count2;
-        
         if(last_id.compare(toCString(id)) == 0){
             if(score > best_score){
                 best_score = score;
@@ -180,15 +205,16 @@ int main(int argc, char const * argv[])
             if(verbose){
                 std::cout << "Select this one: " << last_id << "\n";
                 std::cout << "Use alignment with Score: " << best_score << "\n";
+                std::cout << best_end1 << "\n" << best_end2 << "\n";
             }
             
-            writeRecord(seqFileOut, best_end1, end1);
-            writeRecord(seqFileOut, best_end2, end2);
+            writeRecord(seqFileOut, idend1, best_end1);
+            writeRecord(seqFileOut, idend2, best_end2);
             
-            best_score = score;
-            best_end1 = end1;
-            best_end2 = end2;
-            last_id = toCString(id);
+                best_score = score;
+                best_end1 = end1;
+                best_end2 = end2;
+                last_id = toCString(id);
         }
         
         if(atEnd(bamFileIn)){
@@ -196,11 +222,14 @@ int main(int argc, char const * argv[])
             CharString idend2 = last_id;
             idend1 += "_end1";
             idend2 += "_end2";
-            writeRecord(seqFileOut, best_end1, end1);
-            writeRecord(seqFileOut, best_end2, end2);
+            writeRecord(seqFileOut, idend1, best_end1);
+            writeRecord(seqFileOut, idend2, best_end2);
         }
+        
+        
 
     }
+    close(seqFileOut);
 
 
     std::cout << "Finished!\n";
