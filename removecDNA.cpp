@@ -225,24 +225,22 @@ int main(int argc, char const * argv[])
             String<CigarElement<> > cigar = record.cigar;
             //take front
             int pos = 0;
+            //count amount of overall matches in cigar string
             int match_count = 0;
             bool found = false;
             for(int i = 0; i < length(cigar); ++i){
-//                  std::cout << "C: " << cigar[i].count << cigar[i].operation << "\n";
-//                 std::cout << match_count << "\n";
-//                 std::cout << pos << "\n";
-//                 std::cout << (cigar[i].operation == match.operation) << "\n";
+
                 if (cigar[i].operation == op_match)
                     match_count += cigar[i].count;
 
-                if (match_count > threshold){
+                //taake prefix of the read as soon as more than threshold many matches are found
+                if (match_count > threshold && !found){
 //                     std::cout << "found pos: " << pos << "\n";
                     end1 = prefix(end1, pos + 1);
-
                     found = true;
-                    break;
                 }
-                if(cigar[i].operation == op_match || cigar[i].operation == op_soft || cigar[i].operation == op_del)
+                //calculate end position of prefix according to cigar string
+                if(!found && (cigar[i].operation == op_match || cigar[i].operation == op_soft || cigar[i].operation == op_del))
                     pos += cigar[i].count;
             }
 
@@ -255,17 +253,15 @@ int main(int argc, char const * argv[])
                 continue;
             }
 
-    //             std::cout << "final Match count: " << match_count << " found: " << found << "\n";
-    //             std::cout << "Cut end" << "\n";
                 pos = 0;
                 int match_count2 = 0;
                 bool found2 = false;
                 for(int i = length(cigar) - 1; i >= 0 ; --i){
-    //                 std::cout << "C: " << cigar[i].count << cigar[i].operation << "\n";
-    //                 std::cout << pos << "\n";
+
                     if (cigar[i].operation == op_match)
                         match_count2 += cigar[i].count;
 
+                    //since the overall match count is know we can stop as soon as we determined the start position of the prefix
                     if (match_count2 > threshold){
     //                     std::cout << "found pos: " << pos << "\n";
                         end2 = suffix(end2, length(end2) - pos - 1);
@@ -278,15 +274,15 @@ int main(int argc, char const * argv[])
                 }
 
                 if(verbose){
-                    std::cout << "lenght end1: " << length(end1) << "\tScore: " << match_count << "\n";
+                    std::cout << "lenght end1: " << length(end1) << "\n";
 
-                    std::cout << "lenght end2: " << length(end2) << "\tScore: " << match_count2 << "\n";
+                    std::cout << "lenght end2: " << length(end2) << "\n";
 
-                    std::cout << "Score: " << (match_count + match_count2) << "\n";
+                    std::cout << "Score: " << (match_count) << "\n";
                 }
 
 
-                score = match_count + match_count2;
+                score = match_count;
 
         if(last_id.compare(toCString(id)) == 0){
             if(score > best_score){
