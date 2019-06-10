@@ -17,8 +17,26 @@ using namespace std;
 
 
 
-void writeRead(SeqFileOut & seqFileOut, string & last_id, Dna5String & end1, Dna5String & end2)
+void writeRead(SeqFileOut & seqFileOut, string & last_id, Dna5String & end1, Dna5String & end2, bool rc, bool verbose = false)
 {
+    if(rc){
+        Dna5StringReverseComplement rcend1(end1);
+        Dna5StringReverseComplement rcend2(end2);
+
+        if(verbose){
+            std::cout << "Use reverse Complement of reads to restore original orientation.\n";
+            std::cout << "before: " << end1 << "\n";
+        }
+        end1 = rcend1;
+        end2 = rcend2;
+        if(verbose)
+            std::cout << "after:  " << end1 << "\n";
+    }
+    else
+    {
+        std::cout << "Is in original orientation\n";
+    }
+
     CharString idend1 = last_id;
     CharString idend2 = last_id;
     idend1 += "_end1";
@@ -29,6 +47,50 @@ void writeRead(SeqFileOut & seqFileOut, string & last_id, Dna5String & end1, Dna
 }
 
 
+bool checkIfSameOrientation(Dna5String & originalRead, Dna5String & bamRead){
+
+    bool reverseComplement;
+    Dna5StringReverseComplement rcBamRead(bamRead);
+//     appendValue(rcReads, myModifier);
+    for(int i = 0; i < length(bamRead); ++i)
+    {
+//         std::cout << i << ": " << originalRead[i] << "\t" << bamRead[i] << "\t" << rcBamRead[i] << "\n";
+
+        if(originalRead[i] != bamRead[i] && originalRead[i] != rcBamRead[i]){
+            std::cout << "Bam and fasta reads are not the same.\n";
+            exit(0);
+        }
+        if(originalRead[i] != bamRead[i]){
+            reverseComplement = true;
+            break;
+        }
+        if(originalRead[i] != rcBamRead[i]){
+            reverseComplement = false;
+            break;
+        }
+    }
+/*
+    if(reverseComplement)
+        std::cout << "reverseComplement\n";
+    else
+        std::cout << "not\n";*/
+
+    return reverseComplement;
+}
+
+Dna5String & getOriginalRead(auto & readMap, string & readID)
+{
+    CharString creadID = readID;
+    auto search = readMap.find(creadID);
+    if (search == readMap.end())
+    {
+        std::cout << "Did not find " << readID << " in fasta file." << "\n";
+        exit(0);
+    }
+    Dna5String & originalRead = search->second;
+
+    return originalRead;
+}
 
 int main(int argc, char const * argv[])
 {
@@ -69,24 +131,25 @@ int main(int argc, char const * argv[])
     getOptionValue(threshold, parser, "threshold");
     bool verbose = isSet(parser, "verbose");
 
+    bool checkOrientation = false;
 
-    //TODO add condition
-    //Load umi + barcorde dictionary
-    StringSet<CharString> readIDs;
-    StringSet<Dna5String> reads;
-    SeqFileIn seqFileInReads(toCString(fastaPath));
-    readRecords(readIDs, reads, seqFileInReads);
+    //Load original reads
 
-
-    //prepare dictionary
     std::map<CharString,Dna5String> readMap;
-    int m = 0;
-    while(m < length(readIDs)){
-        readMap[readIDs[m]] = reads[m];
-        ++m;
+
+    if(length(fastaPath) > 0){
+        StringSet<CharString> readIDs;
+        StringSet<Dna5String> reads;
+        checkOrientation = true;
+        SeqFileIn seqFileInReads(toCString(fastaPath));
+        readRecords(readIDs, reads, seqFileInReads);
+        //prepare dictionary
+        int m = 0;
+        while(m < length(readIDs)){
+            readMap[readIDs[m]] = reads[m];
+            ++m;
+        }
     }
-
-
 
     //prepare Bam
     BamFileIn bamFileIn;
@@ -109,9 +172,11 @@ int main(int argc, char const * argv[])
     auto op_del = del.operation;
     BamAlignmentRecord record;
     string last_id;
+    Dna5String last_read;
     int best_score = 0;
     Dna5String best_end1;
     Dna5String best_end2;
+
     bool start = true;
 
 
@@ -139,6 +204,7 @@ int main(int argc, char const * argv[])
 
             if(start){
                 last_id = toCString(id);
+                last_read = record.seq;
                 start = false;
             }
 
@@ -232,23 +298,39 @@ int main(int argc, char const * argv[])
         else
         {
 
-
             if(verbose){
-                std::cout << "Select this one: " << last_id << "\n";
-                std::cout << "Use alignment with Score: " << best_score << "\n";
-                std::cout << best_end1 << "\n" << best_end2 << "\n";
+
+                std::cout << "New Read Id, therefore write alignment with best score of: " << best_score << "\n";
+                std::cout << "from read id: " << last_id << "\n";
             }
 
-            writeRead(seqFileOut, last_id, best_end1, best_end2);
+            bool rc = false;
+            if(checkOrientation){
+
+                Dna5String & originalRead = getOriginalRead(readMap, last_id);
+//                 Dna5String bamRead = record.seq;
+//                 std::cout << "ori: " << originalRead << "\n";
+
+                rc = !checkIfSameOrientation(originalRead, last_read);
+            }
+
+            writeRead(seqFileOut, last_id, best_end1, best_end2, rc, verbose);
 
             best_score = score;
             best_end1 = end1;
             best_end2 = end2;
             last_id = toCString(id);
+            last_read = record.seq;
         }
 
-        if(atEnd(bamFileIn)){
-            writeRead(seqFileOut, last_id, best_end1, best_end2);
+        if(atEnd(bamFileIn)){/*
+            bool rc = false;
+            if(checkOrientation){
+                Dna5String & originalRead = getOriginalRead(readMap, last_id);
+                std::cout << "ori: " << originalRead << "\n";
+                rc = !checkIfSameOrientation(originalRead, record.seq);
+            }*/
+            writeRead(seqFileOut, last_id, best_end1, best_end2, false);
         }
 
 

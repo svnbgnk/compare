@@ -123,7 +123,7 @@ int main(int argc, char const * argv[])
 
             // look up dictionary to find corresponding umi and barcode
             auto search = myMap.find(acc);
-            if (search != myMap.end()) {
+            if (search != myMap.end()){
                 if(verbose)
                     std::cout << "Found " << search->first << " " << search->second << '\n';
             } else {
