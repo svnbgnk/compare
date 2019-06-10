@@ -17,6 +17,17 @@ using namespace std;
 
 
 
+void writeRead(SeqFileOut & seqFileOut, string & last_id, Dna5String & end1, Dna5String & end2)
+{
+    CharString idend1 = last_id;
+    CharString idend2 = last_id;
+    idend1 += "_end1";
+    idend2 += "_end2";
+
+    writeRecord(seqFileOut, idend1, end1);
+    writeRecord(seqFileOut, idend2, end2);
+}
+
 
 
 int main(int argc, char const * argv[])
@@ -25,6 +36,8 @@ int main(int argc, char const * argv[])
 
     addOption(parser, ArgParseOption("b", "bam", "Path to the bam file", ArgParseArgument::INPUT_FILE, "IN"));
     setRequired(parser, "bam");
+
+    addOption(parser, ArgParseOption("f", "fasta", "Path to the fasta with original reads to recover orientation", ArgParseArgument::INPUT_FILE, "IN"));
 
     addOption(parser, ArgParseOption("o", "output", "Path to fasta output file", ArgParseArgument::OUTPUT_FILE, "OUT"));
     setRequired(parser, "output");
@@ -41,6 +54,7 @@ int main(int argc, char const * argv[])
         return res == ArgumentParser::PARSE_ERROR;
 
     CharString bamPath, outputPath;
+    CharString fastaPath = "";
     int batchSize1 = 100000;
 
     int barcode_umi_length = 30;
@@ -48,11 +62,31 @@ int main(int argc, char const * argv[])
     int first = 9999999;
 
     getOptionValue(bamPath, parser, "bam");
+    getOptionValue(fastaPath, parser, "fasta");
     getOptionValue(outputPath, parser, "output");
 //     getOptionValue(barcodeLength, parser, "barcodeL");
     getOptionValue(first, parser, "first");
     getOptionValue(threshold, parser, "threshold");
     bool verbose = isSet(parser, "verbose");
+
+
+    //TODO add condition
+    //Load umi + barcorde dictionary
+    StringSet<CharString> readIDs;
+    StringSet<Dna5String> reads;
+    SeqFileIn seqFileInReads(toCString(fastaPath));
+    readRecords(readIDs, reads, seqFileInReads);
+
+
+    //prepare dictionary
+    std::map<CharString,Dna5String> readMap;
+    int m = 0;
+    while(m < length(readIDs)){
+        readMap[readIDs[m]] = reads[m];
+        ++m;
+    }
+
+
 
     //prepare Bam
     BamFileIn bamFileIn;
@@ -197,10 +231,7 @@ int main(int argc, char const * argv[])
         }
         else
         {
-            CharString idend1 = last_id;
-            CharString idend2 = last_id;
-            idend1 += "_end1";
-            idend2 += "_end2";
+
 
             if(verbose){
                 std::cout << "Select this one: " << last_id << "\n";
@@ -208,22 +239,16 @@ int main(int argc, char const * argv[])
                 std::cout << best_end1 << "\n" << best_end2 << "\n";
             }
 
-            writeRecord(seqFileOut, idend1, best_end1);
-            writeRecord(seqFileOut, idend2, best_end2);
+            writeRead(seqFileOut, last_id, best_end1, best_end2);
 
-                best_score = score;
-                best_end1 = end1;
-                best_end2 = end2;
-                last_id = toCString(id);
+            best_score = score;
+            best_end1 = end1;
+            best_end2 = end2;
+            last_id = toCString(id);
         }
 
         if(atEnd(bamFileIn)){
-            CharString idend1 = last_id;
-            CharString idend2 = last_id;
-            idend1 += "_end1";
-            idend2 += "_end2";
-            writeRecord(seqFileOut, idend1, best_end1);
-            writeRecord(seqFileOut, idend2, best_end2);
+            writeRead(seqFileOut, last_id, best_end1, best_end2);
         }
 
 
