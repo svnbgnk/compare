@@ -26,11 +26,15 @@ void writeRead(SeqFileOut & seqFileOut, string & last_id, Dna5String & end1, Dna
         if(verbose){
             std::cout << "Use reverse Complement of reads to restore original orientation.\n";
             std::cout << "before: " << end1 << "\n";
+            std::cout << "before2: " << end2 << "\n";
         }
-        end1 = rcend1;
-        end2 = rcend2;
-        if(verbose)
+        Dna5String tmpend1 = rcend1;
+        end1 = rcend2;
+        end2 = tmpend1;
+        if(verbose){
             std::cout << "after:  " << end1 << "\n";
+            std::cout << "after2:  " << end2 << "\n";
+        }
     }
     else
     {
