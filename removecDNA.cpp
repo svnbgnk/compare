@@ -38,7 +38,8 @@ void writeRead(SeqFileOut & seqFileOut, string & last_id, Dna5String & end1, Dna
     }
     else
     {
-        std::cout << "Is in original orientation\n";
+        if(verbose)
+            std::cout << "Is in original orientation\n";
     }
 
     CharString idend1 = last_id;
