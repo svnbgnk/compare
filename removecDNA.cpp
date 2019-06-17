@@ -105,6 +105,7 @@ int main(int argc, char const * argv[])
     setRequired(parser, "bam");
 
     addOption(parser, ArgParseOption("f", "fasta", "Path to the fasta with original reads to recover orientation", ArgParseArgument::INPUT_FILE, "IN"));
+    hideOption(getOption(parser, "fasta"));
 
     addOption(parser, ArgParseOption("o", "output", "Path to fasta output file", ArgParseArgument::OUTPUT_FILE, "OUT"));
     setRequired(parser, "output");
@@ -136,8 +137,6 @@ int main(int argc, char const * argv[])
     getOptionValue(threshold, parser, "threshold");
     bool verbose = isSet(parser, "verbose");
 
-    bool checkOrientation = false;
-
     //Load original reads
 
     std::map<CharString,Dna5String> readMap;
@@ -145,7 +144,6 @@ int main(int argc, char const * argv[])
     if(length(fastaPath) > 0){
         StringSet<CharString> readIDs;
         StringSet<Dna5String> reads;
-        checkOrientation = true;
         SeqFileIn seqFileInReads(toCString(fastaPath));
         readRecords(readIDs, reads, seqFileInReads);
         //prepare dictionary
@@ -306,13 +304,17 @@ int main(int argc, char const * argv[])
             }
 
             bool rc = false;
-            if(checkOrientation){
+            if(length(fastaPath) > 0){
 
                 Dna5String & originalRead = getOriginalRead(readMap, last_id);
 //                 Dna5String bamRead = record.seq;
 //                 std::cout << "ori: " << originalRead << "\n";
 
                 rc = !checkIfSameOrientation(originalRead, last_read);
+            }
+            else
+            {
+                rc = hasFlagRC(record);
             }
 
             writeRead(seqFileOut, last_id, best_end1, best_end2, rc, verbose);
