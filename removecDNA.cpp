@@ -205,17 +205,16 @@ int main(int argc, char const * argv[])
             Dna5String end2 = record.seq;
             CharString id = record.qName;
 
-            if(start){
-                last_id = toCString(id);
-                last_read = record.seq;
-                start = false;
-            }
-
-
             if(length(record.seq) == 0){
                 std::cout << toCString(id) << "\n";
                 std::cout << "Read could not be loaded\n";
                 continue;
+            }
+        
+            if(start){
+                last_id = toCString(id);
+                last_read = record.seq;
+                start = false;
             }
 
             if(verbose){
