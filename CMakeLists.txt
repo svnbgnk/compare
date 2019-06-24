@@ -37,7 +37,7 @@ add_definitions (${SEQAN_DEFINITIONS})
 
 # Add CXX flags found by find_package (SeqAn).
 #set (CMAKE_CXX_FLAGS "-std=c++14 -O0 ${CMAKE_CXX_FLAGS} ${SEQAN_CXX_FLAGS} -I/home/sven/devel/sdsl-lite/include")
-set (CMAKE_CXX_FLAGS "-g -static-libstdc++ -std=c++17 -pthread -DSEQAN_DISABLE_VERSION_CHECK=YES")
+set (CMAKE_CXX_FLAGS "-g -static-libstdc++ -std=c++17 -fopenmp -pthread -DSEQAN_DISABLE_VERSION_CHECK=YES")
 # Add CXX flags found by find_package (SeqAn).
 set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${SEQAN_CXX_FLAGS}")
 
@@ -56,3 +56,5 @@ add_executable (removecDNA removecDNA.cpp)
 target_link_libraries (removecDNA ${SEQAN_LIBRARIES})
 add_executable (fixBAM fixBAM.cpp)
 target_link_libraries (fixBAM ${SEQAN_LIBRARIES})
+add_executable (extractReads extractReads.cpp)
+target_link_libraries (extractReads ${SEQAN_LIBRARIES})
