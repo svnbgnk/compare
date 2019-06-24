@@ -128,12 +128,18 @@ int main(int argc, char const * argv[])
 //     getOptionValue(threshold, parser, "threshold");
 //     bool verbose = isSet(parser, "verbose");
     
+    CigarElement<> hard = seqan::CigarElement<>('H', 1);
+    CigarElement<> soft = seqan::CigarElement<>('S', 1);
+    auto op_hard = hard.operation;
+    auto op_soft = soft.operation;
     
         //Read first time
-    std::map<CharString, CharString> readMap;
+    std::map<CharString, std::tuple<CharString, CharString, uint16_t, uint16_t> > readMap;
     {
         StringSet<CharString> readIDs;
         StringSet<CharString> reads;
+        StringSet<CharString> quals;
+        StringSet<String<CigarElement<> >> cigars;
         BamAlignmentRecord record;
 
         BamFileIn bamFileIn;
@@ -152,6 +158,8 @@ int main(int argc, char const * argv[])
                 readRecord(record, bamFileIn);
                 appendValue(readIDs, record.qName);
                 appendValue(reads, record.seq);
+                appendValue(quals, record.qual);
+                appendValue(cigars, record.cigar);
             }
         }
         catch (IOError const & e)
@@ -161,14 +169,56 @@ int main(int argc, char const * argv[])
         }
         //prepare dictionary
         int m = 0;
+        //TODO RC and middle part is clipped
         while(m < length(readIDs)){
-            if(length(reads[m]) > 0)
-                readMap[readIDs[m]] = reads[m];
+            
+            if(length(reads[m]) > 0){
+                int16_t len = length(cigars[m]) - 1;
+                auto search = readMap.find(readIDs[m]);
+                if (search != readMap.end())
+                {
+//                     std::cerr << "Found id again\n";
+                    std::tuple<CharString, CharString, uint16_t, uint16_t> res = search->second;
+                    CharString & seq = std::get<0>(res);
+                    CharString & qual = std::get<1>(res);
+                    uint16_t ofrontH = std::get<2>(res);
+                    uint16_t oendH = std::get<3>(res);
+                    uint16_t fchardClips = (op_hard == cigars[m][0].operation || op_soft == cigars[m][0].operation) ? cigars[m][0].count : 0;
+                    uint16_t bchardClips = (op_hard == cigars[m][len].operation || op_soft == cigars[m][len].operation) ? cigars[m][len].count : 0;
+                    auto newseq = seq;
+                    auto newqual = qual;
+                    if(fchardClips < ofrontH){
+                        newseq = infix(newseq, 0, ofrontH - fchardClips);
+                        newqual = infix(newqual, 0, ofrontH - fchardClips);
+                        append(newseq, reads[m]);
+                        append(newqual, qual[m]);
+                        std::cerr << "m: " << m << "\t" << readIDs[m] << "\tbetter read found updating";
+                        ofrontH = fchardClips;
+                    }
+                    if(bchardClips < oendH){
+                        seq = infix(seq, length(seq) + oendH - bchardClips - 1, length(seq) - 1);
+                        qual = infix(qual, length(seq) + oendH - bchardClips - 1, length(qual) - 1);
+                        append(newseq, seq);
+                        append(newqual, qual);
+                        std::cerr << "m: " << m << "\t" << readIDs[m] << "\tbetter read found updating";
+                        oendH = bchardClips;
+                    }
+                    search->second = std::make_tuple(newseq, quals[m], ofrontH, oendH);
+                }else{
+//                     std::cerr << "Found new id\n";
+                    uint16_t fchardClips = (op_hard == cigars[m][0].operation || op_soft == cigars[m][0].operation) ? cigars[m][0].count : 0;
+                    uint16_t bchardClips = (op_hard == cigars[m][len].operation || op_soft == cigars[m][len].operation) ? cigars[m][len].count : 0;
+//                     std::cerr << "Clips\n";
+                    readMap[readIDs[m]] = std::make_tuple(reads[m], quals[m], fchardClips, bchardClips);
+//                     std::cerr << "fin\n";
+                }
+            }
             ++m;
         }
         close(bamFileIn);
     }
 
+    std::cerr << "Finished Map\n";
     // Open input file, BamFileIn can read SAM and BAM files.
     BamFileIn bamFileIn;
     if (!open(bamFileIn, toCString(bamPath)))
@@ -199,8 +249,21 @@ int main(int argc, char const * argv[])
                     std::cerr << "Did not find " << id << " in bam file. There is no sequence for this readid denoted in the bam file" << "\n";
                     exit(0);
                 }
-                CharString seq = search->second;
-                record.seq = seq;
+
+                std::tuple<CharString, CharString, uint16_t, uint16_t> res = search->second;
+                CharString & seq = std::get<0>(res);
+                CharString & qual = std::get<1>(res);
+                int ofrontH = std::get<2>(res);
+                int oendH = std::get<3>(res);
+                
+                auto cigar = record.cigar;
+                int len = length(cigar) - 1;
+                int fchardClips = (op_hard == cigar[0].operation || op_soft == cigar[0].operation) ? cigar[0].count : 0;
+                int bchardClips = (op_hard == cigar[len].operation || op_soft == cigar[len].operation) ? cigar[len].count : 0;
+                
+                record.seq = infix(seq, fchardClips - ofrontH, length(seq) - bchardClips + oendH - 1);
+                record.qual = infix(qual, fchardClips - ofrontH, length(seq) - bchardClips + oendH - 1);
+                std::cerr << "id: " << id << "\t" << length(seq) << ":" << length(record.seq) << "\t" << ofrontH << ":" << oendH << "\t"  << fchardClips << ":" << bchardClips << "\n" << toCString(seq) << "\n\n";
             }
             writeRecord(bamFileOut, record);
         }
