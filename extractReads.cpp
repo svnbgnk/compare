@@ -32,7 +32,10 @@ int main(int argc, char const * argv[])
     addOption(parser, ArgParseOption("o", "output", "Path to the output prefix", ArgParseArgument::INPUT_FILE, "IN"));
     setRequired(parser, "gtf");
     
+    addOption(parser, ArgParseOption("s", "step", "Number of exons in single bam", ArgParseArgument::INTEGER, "INT"));
+    
     addOption(parser, ArgParseOption("t", "threads", "Number of threads", ArgParseArgument::INTEGER, "INT"));
+    
 /*
     addOption(parser, ArgParseOption("p", "first", "First p reads", ArgParseArgument::INTEGER, "INT"));
     hideOption(getOption(parser, "first"));
@@ -52,10 +55,12 @@ int main(int argc, char const * argv[])
     int threshold = 5;
     int first = 9999999;
     int threads = 1;
+    int step = 1;
 
     getOptionValue(bamPath, parser, "bam");
     getOptionValue(gtfPath, parser, "gtf");
     getOptionValue(outputPathPrefix, parser, "output");
+    getOptionValue(step, parser, "step");
     getOptionValue(threads, parser, "threads");
 //     getOptionValue(barcodeLength, parser, "barcodeL");
 //     getOptionValue(first, parser, "first");
@@ -181,7 +186,7 @@ int main(int argc, char const * argv[])
         
         string prefix = toCString(outputPathPrefix);
         #pragma omp parallel for schedule(dynamic) num_threads(threads)
-        for(int b = 0; b < recordtable.size(); ++b)
+        for(int b = 0; b < recordtable.size(); b += step)
         {
             ofstream mybamstream;
             string bamName = prefix + to_string(b) + ".bam";
@@ -189,8 +194,10 @@ int main(int argc, char const * argv[])
             // Open output file, BamFileOut accepts also an ostream and a format tag.
             BamFileOut bamFileOut(context(bamFileIn), mybamstream, Bam());
             writeHeader(bamFileOut, header);
-            for(int i = 0; i < recordtable[b].size(); ++i){
-                writeRecord(bamFileOut, recordtable[b][i]);
+            for(int j = 0; j < step && (b + j) < recordtable.size(); ++j){
+                for(int i = 0; i < recordtable[b + j].size(); ++i){
+                    writeRecord(bamFileOut, recordtable[b + j][i]);
+                }
             }
             close(bamFileOut);
         }
