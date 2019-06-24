@@ -135,6 +135,7 @@ int main(int argc, char const * argv[])
         bool newChrom = true;
         bool stNew = true;
         bool endNew = false;
+        uint32_t k = 0;
         while (!atEnd(bamFileIn))
         {
             readRecord(record, bamFileIn);
@@ -149,7 +150,6 @@ int main(int argc, char const * argv[])
                 stNew = true;
                 for(int i = 0; i < table.size(); ++i){
                     string rowContig = toCString(std::get<0>(table[i]));
-                    std::cout << "Check rowContig: " << rowContig << "\t" << recordContig << "\n";
                     if(recordContig.compare(rowContig) == 0 && stNew){
                         stNew = false;
                         st = i;
@@ -163,11 +163,12 @@ int main(int argc, char const * argv[])
                     if(recordContig.compare(rowContig) == 0)
                         end = table.size();
                 }
-                
                 lastContig = recordContig;
+                std::cout << "Chrom: " << lastContig << "\n";
                 std::cout << "Start: " << st << "\tEnd: " << end << "\n";
+                std::cout << "Record: " << k << "\n";
             }
-            
+            ++k;
             #pragma omp parallel for num_threads(threads) schedule(static)
             for(int i = st; i < end; ++i){
                 //check row
@@ -180,8 +181,6 @@ int main(int argc, char const * argv[])
                     recordtable[i].push_back(record);
                 }
             }
-            
-//             writeRecord(bamFileOut, record);
         }
         
         string prefix = toCString(outputPathPrefix);
