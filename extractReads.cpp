@@ -148,8 +148,9 @@ int main(int argc, char const * argv[])
             //determine search range
             if(lastContig.compare(recordContig) != 0){
                 stNew = true;
+                string rowContig;
                 for(int i = 0; i < table.size(); ++i){
-                    string rowContig = toCString(std::get<0>(table[i]));
+                    rowContig = toCString(std::get<0>(table[i]));
                     if(recordContig.compare(rowContig) == 0 && stNew){
                         stNew = false;
                         st = i;
@@ -159,10 +160,17 @@ int main(int argc, char const * argv[])
                         end = i;
                         break;
                     }
-                    // in case last element matches
-                    if(recordContig.compare(rowContig) == 0)
-                        end = table.size();
                 }
+                
+                // in case last element matches
+                if(recordContig.compare(rowContig) == 0)
+                    end = table.size();
+                // in case no element matches
+                if(stNew){
+                    st = table.size();
+                    end = table.size();
+                }
+                
                 lastContig = recordContig;
                 std::cout << "Chrom: " << lastContig << "\n";
                 std::cout << "Start: " << st << "\tEnd: " << end << "\n";
