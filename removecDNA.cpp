@@ -206,8 +206,8 @@ int main(int argc, char const * argv[])
             CharString id = record.qName;
 
             if(length(record.seq) == 0){
-                std::cout << toCString(id) << "\n";
-                std::cout << "Read could not be loaded\n";
+//                 std::cout << toCString(id) << "\n";
+//                 std::cout << "Read could not be loaded\n";
                 continue;
             }
         
