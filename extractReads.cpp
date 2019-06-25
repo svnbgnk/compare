@@ -132,10 +132,10 @@ int main(int argc, char const * argv[])
         
         string lastContig;
         int st = 0;
-        int end = table.size() - 1;
-        bool newChrom = true;
+        int end = 0;
         bool stNew = true;
         bool endNew = false;
+        bool skip = false;
         uint32_t k = 0;
         while (!atEnd(bamFileIn))
         {
@@ -147,7 +147,12 @@ int main(int argc, char const * argv[])
             uint32_t recordEnd = recordBegin + length(record.seq);
             
             //determine search range
+//             bool same = true;
             if(lastContig.compare(recordContig) != 0){
+                skip = false;
+                for(int i = st; i < end; ++i)
+                    table.erase(table.begin() + st);
+//                 same = false;
                 stNew = true;
                 string rowContig;
                 for(int i = 0; i < table.size(); ++i){
@@ -168,7 +173,7 @@ int main(int argc, char const * argv[])
                     end = table.size();
                 // in case no element matches
                 if(stNew){
-                    continue;
+                    skip = true;
                 }
                 
                 lastContig = recordContig;
@@ -177,8 +182,15 @@ int main(int argc, char const * argv[])
                 std::cout << "Record: " << k << "\n";
             }
             ++k;
-            #pragma omp parallel for num_threads(threads) schedule(static)
+            
+            if(skip){
+                std::cout << "Skip not in gtf file: " << lastContig << "\n";
+                st = table.size();
+                end = table.size();
+                continue;
+            }
             //TODO assume sorted
+            #pragma omp parallel for num_threads(threads) schedule(static)
             for(int i = st; i < end; ++i){
                 //check row
                 string rowContig = toCString(std::get<0>(table[i]));
@@ -187,11 +199,15 @@ int main(int argc, char const * argv[])
                 //std::cout << "recordBegin: " << recordBegin << "\t" << recordEnd << "\trow: " << rowBegin << "\t" << rowEnd << "\n";
                 if((recordBegin > rowBegin && recordBegin < rowEnd) || (recordEnd > rowBegin && recordEnd < rowEnd))
                 {
+                    //last record did not match sorted coordinates therefore next does not also
+//                     if(same && st < i)
+//                         st = i;
                     recordtable[i].push_back(record);
                 }
             }
         }
         
+        std::cout << "Writing\n";
         string prefix = toCString(outputPathPrefix);
         #pragma omp parallel for schedule(dynamic) num_threads(threads)
         for(int b = 0; b < recordtable.size(); b += step)
