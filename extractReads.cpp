@@ -130,7 +130,7 @@ int main(int argc, char const * argv[])
         BamAlignmentRecord record;
         recordtable.resize(table.size());
         
-        string lastContig;
+        string lastContig = "ou";
         int st = 0;
         int end = 0;
         bool stNew = true;
@@ -140,12 +140,12 @@ int main(int argc, char const * argv[])
         while (!atEnd(bamFileIn))
         {
             readRecord(record, bamFileIn);
-            //loop
             //use map to jump to correct chromosom //use start pos and length
+            if(hasFlagUnmapped(record))
+                continue;
             string recordContig = toCString(getContigName(record, bamFileIn));
             uint32_t recordBegin = record.beginPos;
             uint32_t recordEnd = recordBegin + length(record.seq);
-            
             //determine search range
 //             bool same = true;
             if(lastContig.compare(recordContig) != 0){
