@@ -149,10 +149,14 @@ int main(int argc, char const * argv[])
             //determine search range
 //             bool same = true;
             if(lastContig.compare(recordContig) != 0){
-                skip = false;
-                for(int i = st; i < end; ++i)
-                    table.erase(table.begin() + st);
+                std::cout << "Calc new Range for: \n";
+                if(!skip)
+                {
+                    for(int i = st; i < end; ++i)
+                        table.erase(table.begin() + st);
+                }
 //                 same = false;
+                skip = false;
                 stNew = true;
                 string rowContig;
                 for(int i = 0; i < table.size(); ++i){
@@ -171,20 +175,22 @@ int main(int argc, char const * argv[])
                 // in case last element matches
                 if(recordContig.compare(rowContig) == 0)
                     end = table.size();
-                // in case no element matches
-                if(stNew){
-                    skip = true;
-                }
                 
                 lastContig = recordContig;
                 std::cout << "Chrom: " << lastContig << "\n";
                 std::cout << "Start: " << st << "\tEnd: " << end << "\n";
                 std::cout << "Record: " << k << "\n";
+                
+                // in case no element matches
+                if(stNew){
+                    std::cout << "Skip not in gtf file: " << lastContig << "\n";
+                    skip = true;
+                }
+
             }
             ++k;
             
             if(skip){
-                std::cout << "Skip not in gtf file: " << lastContig << "\n";
                 st = table.size();
                 end = table.size();
                 continue;
