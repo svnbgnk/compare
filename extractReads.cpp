@@ -94,12 +94,13 @@ int main(int argc, char const * argv[])
                 ++k;
             }
             CharString refid = tmprow[0];
-            std::cout << tmprow[0] << "\t" << tmprow[1] << "\t" << tmprow[2] << "\n";
+//             std::cout << tmprow[0] << "\t" << tmprow[1] << "\t" << tmprow[2] << "\n";
             int s = std::stoi(tmprow[1]);
             int e = std::stoi(tmprow[2]);
             table.push_back(std::make_tuple(refid, s, e));
         }
-        std::cout << "Finished reading\n";/*
+//         std::cout << "Finished reading\n";
+        /*
         for (unsigned i = 0; i < table.size(); i++){
                 std::cout << std::get<0>(table[i]) << "\t" << std::get<1>(table[i]) << "\t" << std::get<2>(table[i]) << "\n";
         }
@@ -167,8 +168,7 @@ int main(int argc, char const * argv[])
                     end = table.size();
                 // in case no element matches
                 if(stNew){
-                    st = table.size();
-                    end = table.size();
+                    continue;
                 }
                 
                 lastContig = recordContig;
@@ -178,6 +178,7 @@ int main(int argc, char const * argv[])
             }
             ++k;
             #pragma omp parallel for num_threads(threads) schedule(static)
+            //TODO assume sorted
             for(int i = st; i < end; ++i){
                 //check row
                 string rowContig = toCString(std::get<0>(table[i]));
