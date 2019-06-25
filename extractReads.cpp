@@ -218,6 +218,13 @@ int main(int argc, char const * argv[])
         #pragma omp parallel for schedule(dynamic) num_threads(threads)
         for(int b = 0; b < recordtable.size(); b += step)
         {
+            int cumLength = 0;
+            for(int j = 0; j < step && (b + j) < recordtable.size(); ++j){
+                cumLength += recordtable[b + j].size();
+            }
+            if(cumLength == 0)
+                continue;
+            
             ofstream mybamstream;
             string bamName = prefix + to_string(b) + ".bam";
             mybamstream.open(bamName);
