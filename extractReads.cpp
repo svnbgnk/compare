@@ -29,8 +29,11 @@ int main(int argc, char const * argv[])
     addOption(parser, ArgParseOption("g", "gtf", "Path to the gtf file", ArgParseArgument::INPUT_FILE, "IN"));
     setRequired(parser, "gtf");
     
+    
+    addOption(parser, ArgParseOption("su", "suffix", "Suffix concatenated to ouput files (beside .bam)",
+                                     ArgParseOption::STRING));
+    
     addOption(parser, ArgParseOption("o", "output", "Path to the output prefix", ArgParseArgument::INPUT_FILE, "IN"));
-    setRequired(parser, "gtf");
     
     addOption(parser, ArgParseOption("s", "step", "Number of exons in single bam", ArgParseArgument::INTEGER, "INT"));
     
@@ -48,7 +51,7 @@ int main(int argc, char const * argv[])
     if (res != ArgumentParser::PARSE_OK)
         return res == ArgumentParser::PARSE_ERROR;
 
-    CharString bamPath, gtfPath, outputPathPrefix = "reads";
+    CharString bamPath, gtfPath, outputPathPrefix = "reads", suffix = "";
     int batchSize1 = 100000;
 
     int barcode_umi_length = 30;
@@ -60,6 +63,7 @@ int main(int argc, char const * argv[])
     getOptionValue(bamPath, parser, "bam");
     getOptionValue(gtfPath, parser, "gtf");
     getOptionValue(outputPathPrefix, parser, "output");
+    getOptionValue(suffix, parser, "suffix");
     getOptionValue(step, parser, "step");
     getOptionValue(threads, parser, "threads");
 //     getOptionValue(barcodeLength, parser, "barcodeL");
@@ -226,7 +230,7 @@ int main(int argc, char const * argv[])
                 continue;
             
             ofstream mybamstream;
-            string bamName = prefix + to_string(b) + ".bam";
+            string bamName = prefix + to_string(b) + toCString(suffix) + ".bam";
             mybamstream.open(bamName);
             // Open output file, BamFileOut accepts also an ostream and a format tag.
             BamFileOut bamFileOut(context(bamFileIn), mybamstream, Bam());
