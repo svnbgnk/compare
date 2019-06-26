@@ -68,6 +68,7 @@ int main(int argc, char const * argv[])
     uint64_t reads = 0;
     uint64_t unmapped = 0;
     uint64_t multi = 0;
+    bool same = false;
 
     BamHeader header;
     std::vector<std::vector<BamAlignmentRecord > > recordtable;
@@ -87,8 +88,13 @@ int main(int argc, char const * argv[])
             readRecord(record, bamFileIn);
             if(lastrecordName.compare(toCString(record.qName)) == 0){
                 ++multi;
+                if(!same){
+                    ++multi;
+                    same = true;
+                }
             }else{
                 lastrecordName = toCString(record.qName);
+                same = false;
             }
             ++reads;
             //use map to jump to correct chromosom //use start pos and length
