@@ -29,11 +29,13 @@ int main(int argc, char const * argv[])
     addOption(parser, ArgParseOption("g", "gtf", "Path to the gtf file", ArgParseArgument::INPUT_FILE, "IN"));
     setRequired(parser, "gtf");
     
+    addOption(parser, ArgParseOption("e", "extend", "Extend region by this size to both sides.", ArgParseArgument::INTEGER, "INT"));
     
     addOption(parser, ArgParseOption("su", "suffix", "Suffix concatenated to ouput files (beside .bam)",
                                      ArgParseOption::STRING));
     
     addOption(parser, ArgParseOption("o", "output", "Path to the output prefix", ArgParseArgument::INPUT_FILE, "IN"));
+    setRequired(parser, "output");
     
     addOption(parser, ArgParseOption("s", "step", "Number of exons in single bam", ArgParseArgument::INTEGER, "INT"));
     
@@ -59,11 +61,13 @@ int main(int argc, char const * argv[])
     int first = 9999999;
     int threads = 1;
     int step = 1;
+    int overlap = 0;
 
     getOptionValue(bamPath, parser, "bam");
     getOptionValue(gtfPath, parser, "gtf");
     getOptionValue(outputPathPrefix, parser, "output");
     getOptionValue(suffix, parser, "suffix");
+    getOptionValue(overlap, parser, "extend");
     getOptionValue(step, parser, "step");
     getOptionValue(threads, parser, "threads");
 //     getOptionValue(barcodeLength, parser, "barcodeL");
@@ -207,7 +211,8 @@ int main(int argc, char const * argv[])
                 uint32_t rowBegin = std::get<1>(table[i]);
                 uint32_t rowEnd = std::get<2>(table[i]);
                 //std::cout << "recordBegin: " << recordBegin << "\t" << recordEnd << "\trow: " << rowBegin << "\t" << rowEnd << "\n";
-                if((recordBegin > rowBegin && recordBegin < rowEnd) || (recordEnd > rowBegin && recordEnd < rowEnd))
+                if((recordBegin + overlap >= rowBegin && recordBegin <= rowEnd + overlap) || (recordEnd + overlap >= rowBegin && recordEnd <= rowEnd + overlap)
+                    || (recordBegin <= rowBegin && recordEnd >= rowEnd))
                 {
                     //last record did not match sorted coordinates therefore next does not also
 //                     if(same && st < i)
