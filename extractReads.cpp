@@ -35,9 +35,13 @@ int main(int argc, char const * argv[])
     
     addOption(parser, ArgParseOption("o", "output", "Path to the output prefix", ArgParseArgument::INPUT_FILE, "IN"));
     
+    addOption(parser, ArgParseOption("ov", "overlap", "Extend each region by that amount", ArgParseArgument::INTEGER, "INT"));
+    
     addOption(parser, ArgParseOption("s", "step", "Number of exons in single bam", ArgParseArgument::INTEGER, "INT"));
     
     addOption(parser, ArgParseOption("t", "threads", "Number of threads", ArgParseArgument::INTEGER, "INT"));
+    
+    
     
 /*
     addOption(parser, ArgParseOption("p", "first", "First p reads", ArgParseArgument::INTEGER, "INT"));
@@ -59,9 +63,11 @@ int main(int argc, char const * argv[])
     int first = 9999999;
     int threads = 1;
     int step = 1;
+    int overlapI = 0;
 
     getOptionValue(bamPath, parser, "bam");
     getOptionValue(gtfPath, parser, "gtf");
+    getOptionValue(overlapI, parser, "overlap");
     getOptionValue(outputPathPrefix, parser, "output");
     getOptionValue(suffix, parser, "suffix");
     getOptionValue(step, parser, "step");
@@ -71,6 +77,7 @@ int main(int argc, char const * argv[])
 //     getOptionValue(threshold, parser, "threshold");
 //     bool verbose = isSet(parser, "verbose");
 
+    int const overlap = overlapI;
 
     //Read gtf file
     ifstream inputFile(toCString(gtfPath));
@@ -207,11 +214,13 @@ int main(int argc, char const * argv[])
                 uint32_t rowBegin = std::get<1>(table[i]);
                 uint32_t rowEnd = std::get<2>(table[i]);
                 //std::cout << "recordBegin: " << recordBegin << "\t" << recordEnd << "\trow: " << rowBegin << "\t" << rowEnd << "\n";
-                if((recordBegin > rowBegin && recordBegin < rowEnd) || (recordEnd > rowBegin && recordEnd < rowEnd))
+                if((recordBegin + overlap >= rowBegin && recordBegin <= rowEnd + overlap) || (recordEnd + overlap >= rowBegin && recordEnd <= rowEnd + overlap)
+                    || (recordBegin <= rowBegin + overlap && recordEnd + overlap >= rowEnd))
                 {
                     //last record did not match sorted coordinates therefore next does not also
 //                     if(same && st < i)
 //                         st = i;
+                    
                     recordtable[i].push_back(record);
                 }
             }
