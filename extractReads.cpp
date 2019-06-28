@@ -34,6 +34,7 @@ int main(int argc, char const * argv[])
                                      ArgParseOption::STRING));
     
     addOption(parser, ArgParseOption("o", "output", "Path to the output prefix", ArgParseArgument::INPUT_FILE, "IN"));
+    setRequired(parser, "output");
     
     addOption(parser, ArgParseOption("ov", "overlap", "Extend each region by that amount", ArgParseArgument::INTEGER, "INT"));
     
