@@ -41,9 +41,10 @@ int main(int argc, char const * argv[])
     
     addOption(parser, ArgParseOption("t", "threads", "Number of threads", ArgParseArgument::INTEGER, "INT"));
     
+    addOption(parser, ArgParseOption("ov", "overlapping", "Include Reads that are overlapping the specified region."));
     
-    addOption(parser, ArgParseOption("th", "threshold", "Include overlapping reads if they start or end in threshold distance.", ArgParseArgument::INTEGER, "INT"));
-    
+    addOption(parser, ArgParseOption("th", "threshold", "Include overlapping reads if they start and end in threshold distance.", ArgParseArgument::INTEGER, "INT"));
+
     addOption(parser, ArgParseOption("d", "removeDuplicates", "Only inlcude a read into 1 region (random region) even if it occurres in mulitple."));
 /*
     addOption(parser, ArgParseOption("p", "first", "First p reads", ArgParseArgument::INTEGER, "INT"));
@@ -75,6 +76,7 @@ int main(int argc, char const * argv[])
     getOptionValue(step, parser, "step");
     getOptionValue(threads, parser, "threads");
     getOptionValue(threshold, parser, "threshold");
+    bool overlapping = isSet(parser, "overlapping");
     bool rmDup = isSet(parser, "removeDuplicates");
 //     getOptionValue(barcodeLength, parser, "barcodeL");
 //     getOptionValue(first, parser, "first");
