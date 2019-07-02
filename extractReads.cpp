@@ -116,10 +116,10 @@ int main(int argc, char const * argv[])
         }
 //         std::cout << "Finished reading\n";
         
-        for (unsigned i = 0; i < table.size(); i++){
-                std::cout << std::get<0>(table[i]) << "\t" << std::get<1>(table[i]) << "\t" << std::get<2>(table[i]) << "\n";
-        }
-        std::cout << "\n";
+//         for (unsigned i = 0; i < table.size(); i++){
+//                 std::cout << std::get<0>(table[i]) << "\t" << std::get<1>(table[i]) << "\t" << std::get<2>(table[i]) << "\n";
+//         }
+//         std::cout << "\n";
         inputFile.close();
     }
     else
@@ -224,12 +224,18 @@ int main(int argc, char const * argv[])
                 uint32_t rowBegin = std::get<1>(table[i]);
                 uint32_t rowEnd = std::get<2>(table[i]);
                 
-                if((recordBegin >= rowBegin && recordBegin <= rowEnd) || (recordEnd >= rowBegin && recordEnd <= rowEnd)
-                    || ((threshold > -1) && (recordBegin + threshold >= rowBegin && recordBegin <= rowBegin) || (recordEnd <= threshold + rowEnd && recordEnd >= rowEnd)))
+                if((recordBegin >= rowBegin && recordBegin <= rowEnd) || (recordEnd >= rowBegin && recordEnd <= rowEnd))
                 {
-                    #pragma omp critical
-                    {
-                    recordtable[i].push_back(record);
+                    //do not take overlapping
+                    if (threshold == -1){
+                        #pragma omp critical
+                        recordtable[i].push_back(record);
+                        //check overlapping
+                    }else if (recordBegin >= rowBegin && recordEnd <= rowEnd){
+                        if((recordBegin + threshold >= rowBegin && recordBegin <= rowBegin) && (recordEnd <= threshold + rowEnd && recordEnd >= rowEnd)){
+                        #pragma omp critical
+                        recordtable[i].push_back(record);
+                        }
                     }
                 }
                 //std::cout << "recordBegin: " << recordBegin << "\t" << recordEnd << "\trow: " << rowBegin << "\t" << rowEnd << "\n";
