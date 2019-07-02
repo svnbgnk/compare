@@ -41,11 +41,15 @@ int main(int argc, char const * argv[])
     
     addOption(parser, ArgParseOption("t", "threads", "Number of threads", ArgParseArgument::INTEGER, "INT"));
     
+    
+    addOption(parser, ArgParseOption("th", "threshold", "Include overlapping reads if they start or end in threshold distance.", ArgParseArgument::INTEGER, "INT"));
+    
+    addOption(parser, ArgParseOption("d", "removeDuplicates", "Only inlcude a read into 1 region (smallest coordinate) even if it occurres in mulitple."));
 /*
     addOption(parser, ArgParseOption("p", "first", "First p reads", ArgParseArgument::INTEGER, "INT"));
     hideOption(getOption(parser, "first"));
 
-    addOption(parser, ArgParseOption("mt", "threshold", "Number of matches required to define start or end of the cDNA part", ArgParseArgument::INTEGER, "INT"));
+    
 
     addOption(parser, ArgParseOption("v", "verbose", ""));*/
 
@@ -57,7 +61,7 @@ int main(int argc, char const * argv[])
     int batchSize1 = 100000;
 
     int barcode_umi_length = 30;
-    int threshold = 5;
+    int threshold = -1;
     int first = 9999999;
     int threads = 1;
     int step = 1;
@@ -70,9 +74,11 @@ int main(int argc, char const * argv[])
     getOptionValue(overlap, parser, "extend");
     getOptionValue(step, parser, "step");
     getOptionValue(threads, parser, "threads");
+    getOptionValue(threshold, parser, "threshold");
+    bool rmDup = isSet(parser, "removeDuplicates");
 //     getOptionValue(barcodeLength, parser, "barcodeL");
 //     getOptionValue(first, parser, "first");
-//     getOptionValue(threshold, parser, "threshold");
+//     
 //     bool verbose = isSet(parser, "verbose");
 
 
@@ -103,22 +109,29 @@ int main(int argc, char const * argv[])
             }
             CharString refid = tmprow[0];
 //             std::cout << tmprow[0] << "\t" << tmprow[1] << "\t" << tmprow[2] << "\n";
-            int s = std::stoi(tmprow[1]);
-            int e = std::stoi(tmprow[2]);
+            int s = std::stoi(tmprow[1]) - overlap;
+            int e = std::stoi(tmprow[2]) + overlap;
+            s = (s < 0) ? 0 : s;
             table.push_back(std::make_tuple(refid, s, e));
         }
 //         std::cout << "Finished reading\n";
-        /*
+        
         for (unsigned i = 0; i < table.size(); i++){
                 std::cout << std::get<0>(table[i]) << "\t" << std::get<1>(table[i]) << "\t" << std::get<2>(table[i]) << "\n";
         }
-        std::cout << "\n";*/
+        std::cout << "\n";
         inputFile.close();
     }
     else
     {
         std::cout << "Could not open file: " << gtfPath << "\n";
     }
+    
+    std::map<CharString, uint32_t > readIDs;
+    
+//     auto search = readMap.find(readIDs[m]);
+//                 if (search != readMap.end())
+//                 {
 
     // Open input file, BamFileIn can read SAM and BAM files.
     BamFileIn bamFileIn;
@@ -210,15 +223,35 @@ int main(int argc, char const * argv[])
                 string rowContig = toCString(std::get<0>(table[i]));
                 uint32_t rowBegin = std::get<1>(table[i]);
                 uint32_t rowEnd = std::get<2>(table[i]);
+                
+                if((recordBegin >= rowBegin && recordBegin <= rowEnd) || (recordEnd >= rowBegin && recordEnd <= rowEnd)
+                    || ((threshold > -1) && (recordBegin + threshold >= rowBegin && recordBegin <= rowBegin) || (recordEnd <= threshold + rowEnd && recordEnd >= rowEnd)))
+                {
+                    if(!rmDup)
+                    {
+                        recordtable[i].push_back(record);
+                    }
+                    else
+                    {
+                        auto search = readIDs.find(record.qName);
+                        if(search == readIDs.end()){
+                            readIDs[record.qName] = 1;
+                            recordtable[i].push_back(record);
+                        }else{
+                            ++search->second;
+                        }
+                    }
+                }
                 //std::cout << "recordBegin: " << recordBegin << "\t" << recordEnd << "\trow: " << rowBegin << "\t" << rowEnd << "\n";
-                if((recordBegin + overlap >= rowBegin && recordBegin <= rowEnd + overlap) || (recordEnd + overlap >= rowBegin && recordEnd <= rowEnd + overlap)
-                    || (recordBegin <= rowBegin && recordEnd >= rowEnd))
+                /*
+                if((recordBegin >= rowBegin && recordBegin <= rowEnd) || (recordEnd >= rowBegin && recordEnd <= rowEnd)
+                    || (recordBegin + threshold >= rowBegin && recordBegin <= rowBegin) || (recordEnd <= threshold + rowEnd && recordEnd >= rowEnd))
                 {
                     //last record did not match sorted coordinates therefore next does not also
 //                     if(same && st < i)
 //                         st = i;
                     recordtable[i].push_back(record);
-                }
+                }*/
             }
         }
         
