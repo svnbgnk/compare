@@ -227,7 +227,10 @@ int main(int argc, char const * argv[])
                 if((recordBegin >= rowBegin && recordBegin <= rowEnd) || (recordEnd >= rowBegin && recordEnd <= rowEnd)
                     || ((threshold > -1) && (recordBegin + threshold >= rowBegin && recordBegin <= rowBegin) || (recordEnd <= threshold + rowEnd && recordEnd >= rowEnd)))
                 {
+                    #pragma omp critical
+                    {
                     recordtable[i].push_back(record);
+                    }
                 }
                 //std::cout << "recordBegin: " << recordBegin << "\t" << recordEnd << "\trow: " << rowBegin << "\t" << rowEnd << "\n";
                 /*
