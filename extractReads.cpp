@@ -44,7 +44,7 @@ int main(int argc, char const * argv[])
     
     addOption(parser, ArgParseOption("th", "threshold", "Include overlapping reads if they start or end in threshold distance.", ArgParseArgument::INTEGER, "INT"));
     
-    addOption(parser, ArgParseOption("d", "removeDuplicates", "Only inlcude a read into 1 region (smallest coordinate) even if it occurres in mulitple."));
+    addOption(parser, ArgParseOption("d", "removeDuplicates", "Only inlcude a read into 1 region (random region) even if it occurres in mulitple."));
 /*
     addOption(parser, ArgParseOption("p", "first", "First p reads", ArgParseArgument::INTEGER, "INT"));
     hideOption(getOption(parser, "first"));
@@ -227,23 +227,7 @@ int main(int argc, char const * argv[])
                 if((recordBegin >= rowBegin && recordBegin <= rowEnd) || (recordEnd >= rowBegin && recordEnd <= rowEnd)
                     || ((threshold > -1) && (recordBegin + threshold >= rowBegin && recordBegin <= rowBegin) || (recordEnd <= threshold + rowEnd && recordEnd >= rowEnd)))
                 {
-                    if(!rmDup)
-                    {
-                        recordtable[i].push_back(record);
-                    }
-                    else
-                    {
-                        #pragma omp critical
-                        {
-                            auto search = readIDs.find(record.qName);
-                            if(search == readIDs.end()){
-                                readIDs[record.qName] = 1;
-                                recordtable[i].push_back(record);
-                            }else{
-                                ++search->second;
-                            }
-                        }
-                    }
+                    recordtable[i].push_back(record);
                 }
                 //std::cout << "recordBegin: " << recordBegin << "\t" << recordEnd << "\trow: " << rowBegin << "\t" << rowEnd << "\n";
                 /*
@@ -260,7 +244,7 @@ int main(int argc, char const * argv[])
         
         std::cout << "Writing\n";
         string prefix = toCString(outputPathPrefix);
-        #pragma omp parallel for schedule(dynamic) num_threads(threads)
+//         #pragma omp parallel for schedule(dynamic) num_threads(threads)
         for(int b = 0; b < recordtable.size(); b += step)
         {
             int cumLength = 0;
@@ -278,7 +262,22 @@ int main(int argc, char const * argv[])
             writeHeader(bamFileOut, header);
             for(int j = 0; j < step && (b + j) < recordtable.size(); ++j){
                 for(int i = 0; i < recordtable[b + j].size(); ++i){
-                    writeRecord(bamFileOut, recordtable[b + j][i]);
+                    BamAlignmentRecord & record = recordtable[b + j][i];
+                    if(rmDup){
+                        auto search = readIDs.find(record.qName);
+                        if(search == readIDs.end()){
+                            writeRecord(bamFileOut, recordtable[b + j][i]);
+                            readIDs[record.qName] = 1;
+                        }
+                        else
+                        {
+                            ++search->second;
+                        }
+                    }
+                    else
+                    {
+                        writeRecord(bamFileOut, recordtable[b + j][i]);
+                    }
                 }
             }
             close(bamFileOut);
