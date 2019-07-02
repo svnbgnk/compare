@@ -233,12 +233,15 @@ int main(int argc, char const * argv[])
                     }
                     else
                     {
-                        auto search = readIDs.find(record.qName);
-                        if(search == readIDs.end()){
-                            readIDs[record.qName] = 1;
-                            recordtable[i].push_back(record);
-                        }else{
-                            ++search->second;
+                        #pragma omp critical
+                        {
+                            auto search = readIDs.find(record.qName);
+                            if(search == readIDs.end()){
+                                readIDs[record.qName] = 1;
+                                recordtable[i].push_back(record);
+                            }else{
+                                ++search->second;
+                            }
                         }
                     }
                 }
