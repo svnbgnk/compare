@@ -259,9 +259,11 @@ int main(int argc, char const * argv[])
                             recordtable[i].push_back(record);
                             //check overlapping
                         }else if (recordBegin >= rowBegin && recordEnd <= rowEnd){
-                            if((recordBegin + threshold >= rowBegin && recordBegin <= rowBegin) && (recordEnd <= threshold + rowEnd && recordEnd >= rowEnd)){
+                            if(threshold == -1){
+                                recordtable[i].push_back(record);
+                            }else if((recordBegin + threshold >= rowBegin && recordBegin <= rowBegin) && (recordEnd <= threshold + rowEnd && recordEnd >= rowEnd)){
     //                         #pragma omp critical
-                            recordtable[i].push_back(record);
+                                recordtable[i].push_back(record);
                             }
                         }
                     }
