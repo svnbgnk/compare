@@ -39,6 +39,8 @@ int main(int argc, char const * argv[])
     
     addOption(parser, ArgParseOption("s", "step", "Number of exons in single bam", ArgParseArgument::INTEGER, "INT"));
     
+    addOption(parser, ArgParseOption("i", "interval", "Number region which should be checked while reading the bam file at once.", ArgParseArgument::INTEGER, "INT"));
+    
     addOption(parser, ArgParseOption("t", "threads", "Number of threads", ArgParseArgument::INTEGER, "INT"));
     
     addOption(parser, ArgParseOption("ov", "overlapping", "Include Reads that are overlapping the specified region."));
@@ -61,6 +63,7 @@ int main(int argc, char const * argv[])
     CharString bamPath, gtfPath, outputPathPrefix = "reads", suffix = "";
     int batchSize1 = 100000;
 
+    int interval = 50:00;
     int barcode_umi_length = 30;
     int threshold = -1;
     int first = 9999999;
@@ -74,6 +77,7 @@ int main(int argc, char const * argv[])
     getOptionValue(suffix, parser, "suffix");
     getOptionValue(overlap, parser, "extend");
     getOptionValue(step, parser, "step");
+    getOptionValue(interval, parser, "interval");
     getOptionValue(threads, parser, "threads");
     getOptionValue(threshold, parser, "threshold");
     bool overlapping = isSet(parser, "overlapping");
@@ -87,7 +91,7 @@ int main(int argc, char const * argv[])
     //Read gtf file
     ifstream inputFile(toCString(gtfPath));
     string line;
-    vector<std::tuple<CharString, uint32_t, uint32_t> > table;
+    vector<std::tuple<CharString, uint32_t, uint32_t> > completeTable;
     if(inputFile.is_open()){
 //         bool head = true;
         while (getline(inputFile, line, '\n'))
@@ -114,7 +118,7 @@ int main(int argc, char const * argv[])
             int s = std::stoi(tmprow[1]) - overlap;
             int e = std::stoi(tmprow[2]) + overlap;
             s = (s < 0) ? 0 : s;
-            table.push_back(std::make_tuple(refid, s, e));
+            completeTable.push_back(std::make_tuple(refid, s, e));
         }
 //         std::cout << "Finished reading\n";
         
@@ -130,176 +134,194 @@ int main(int argc, char const * argv[])
     }
     
     std::map<CharString, uint32_t > readIDs;
-    
-//     auto search = readMap.find(readIDs[m]);
-//                 if (search != readMap.end())
-//                 {
-
-    // Open input file, BamFileIn can read SAM and BAM files.
-    BamFileIn bamFileIn;
-    if (!open(bamFileIn, toCString(bamPath)))
-    {
-        std::cerr << "ERROR: Could not open " << bamPath << std::endl;
-        return 1;
-    }
-
-    BamHeader header;
-    std::vector<std::vector<BamAlignmentRecord > > recordtable;
-    try
-    {
-        // Copy header.
-        readHeader(header, bamFileIn);
-        // Copy records.
-        BamAlignmentRecord record;
-        recordtable.resize(table.size());
         
-        string lastContig = "ou";
-        int st = 0;
-        int end = 0;
-        bool stNew = true;
-        bool endNew = false;
-        bool skip = false;
-        uint32_t k = 0;
-        while (!atEnd(bamFileIn))
-        {
-            readRecord(record, bamFileIn);
-            //use map to jump to correct chromosom //use start pos and length
-            if(hasFlagUnmapped(record))
-                continue;
-            string recordContig = toCString(getContigName(record, bamFileIn));
-            uint32_t recordBegin = record.beginPos;
-            uint32_t recordEnd = recordBegin + length(record.seq);
-            //determine search range
-//             bool same = true;
-            if(lastContig.compare(recordContig) != 0){
-                std::cout << "Calc new Range for: \n";
-                if(!skip)
-                {
-                    for(int i = st; i < end; ++i)
-                        table.erase(table.begin() + st);
-                }
-//                 same = false;
-                skip = false;
-                stNew = true;
-                string rowContig;
-                for(int i = 0; i < table.size(); ++i){
-                    rowContig = toCString(std::get<0>(table[i]));
-                    if(recordContig.compare(rowContig) == 0 && stNew){
-                        stNew = false;
-                        st = i;
-                    }
-                    if(!stNew && recordContig.compare(rowContig) != 0)
-                    {
-                        end = i;
-                        break;
-                    }
-                }
-                
-                // in case last element matches
-                if(recordContig.compare(rowContig) == 0)
-                    end = table.size();
-                
-                lastContig = recordContig;
-                std::cout << "Chrom: " << lastContig << "\n";
-                std::cout << "Start: " << st << "\tEnd: " << end << "\n";
-                std::cout << "Record: " << k << "\n";
-                
-                // in case no element matches
-                if(stNew){
-                    std::cout << "Skip not in gtf file: " << lastContig << "\n";
-                    skip = true;
-                }
+    
+    
+    // Open input file, BamFileIn can read SAM and BAM files.
 
-            }
-            ++k;
-            
-            if(skip){
-                st = table.size();
-                end = table.size();
-                continue;
-            }
-            //TODO assume sorted
-            #pragma omp parallel for num_threads(threads) schedule(static)
-            for(int i = st; i < end; ++i){
-                //check row
-                string rowContig = toCString(std::get<0>(table[i]));
-                uint32_t rowBegin = std::get<1>(table[i]);
-                uint32_t rowEnd = std::get<2>(table[i]);
-                
-                if((recordBegin >= rowBegin && recordBegin <= rowEnd) || (recordEnd >= rowBegin && recordEnd <= rowEnd))
-                {
-                    //do not take overlapping
-                    if (!overlapping){
-                        #pragma omp critical
-                        recordtable[i].push_back(record);
-                        //check overlapping
-                    }else if (recordBegin >= rowBegin || recordEnd <= rowEnd){
-                        if((recordBegin + threshold >= rowBegin && recordBegin <= rowBegin) && (recordEnd <= threshold + rowEnd && recordEnd >= rowEnd)){
-                        #pragma omp critical
-                        recordtable[i].push_back(record);
-                        }
-                    }
-                }
-                //std::cout << "recordBegin: " << recordBegin << "\t" << recordEnd << "\trow: " << rowBegin << "\t" << rowEnd << "\n";
-                /*
-                if((recordBegin >= rowBegin && recordBegin <= rowEnd) || (recordEnd >= rowBegin && recordEnd <= rowEnd)
-                    || (recordBegin + threshold >= rowBegin && recordBegin <= rowBegin) || (recordEnd <= threshold + rowEnd && recordEnd >= rowEnd))
-                {
-                    //last record did not match sorted coordinates therefore next does not also
-//                     if(same && st < i)
-//                         st = i;
-                    recordtable[i].push_back(record);
-                }*/
-            }
+
+    if(completeTable.size() < interval)
+        interval = completeTable.size();
+  
+
+    int p = 0;
+    while(completeTable.size() > 0){
+        vector<std::tuple<CharString, uint32_t, uint32_t> > table(interval);
+        if(completeTable.size() > interval){
+            table.insert(table.begin(), completeTable.begin(), completeTable.begin() + interval);
+            completeTable.erase(completeTable.begin(), completeTable.begin() + interval);
+        }
+        else
+        {
+            table = completeTable;
+            completeTable.clear();
         }
         
-        std::cout << "Writing\n";
-        string prefix = toCString(outputPathPrefix);
-//         #pragma omp parallel for schedule(dynamic) num_threads(threads)
-        for(int b = 0; b < recordtable.size(); b += step)
+            BamFileIn bamFileIn;
+        if (!open(bamFileIn, toCString(bamPath)))
         {
-            int cumLength = 0;
-            for(int j = 0; j < step && (b + j) < recordtable.size(); ++j){
-                cumLength += recordtable[b + j].size();
-            }
-            if(cumLength == 0)
-                continue;
+            std::cerr << "ERROR: Could not open " << bamPath << std::endl;
+            return 1;
+        }
+        
+        BamHeader header;
+        std::vector<std::vector<BamAlignmentRecord > > recordtable;
+        try
+        {
+            // Copy header.
+            readHeader(header, bamFileIn);
+            // Copy records.
+            BamAlignmentRecord record;
+            recordtable.resize(table.size());
             
-            ofstream mybamstream;
-            string bamName = prefix + to_string(b) + toCString(suffix) + ".bam";
-            mybamstream.open(bamName);
-            // Open output file, BamFileOut accepts also an ostream and a format tag.
-            BamFileOut bamFileOut(context(bamFileIn), mybamstream, Bam());
-            writeHeader(bamFileOut, header);
-            for(int j = 0; j < step && (b + j) < recordtable.size(); ++j){
-                for(int i = 0; i < recordtable[b + j].size(); ++i){
-                    BamAlignmentRecord & record = recordtable[b + j][i];
-                    if(rmDup){
-                        auto search = readIDs.find(record.qName);
-                        if(search == readIDs.end()){
-                            writeRecord(bamFileOut, recordtable[b + j][i]);
-                            readIDs[record.qName] = 1;
+            string lastContig = "ou";
+            int st = 0;
+            int end = 0;
+            bool stNew = true;
+            bool endNew = false;
+            bool skip = false;
+            uint32_t k = 0;
+            while (!atEnd(bamFileIn))
+            {
+                readRecord(record, bamFileIn);
+                //use map to jump to correct chromosom //use start pos and length
+                if(hasFlagUnmapped(record))
+                    continue;
+                string recordContig = toCString(getContigName(record, bamFileIn));
+                uint32_t recordBegin = record.beginPos;
+                uint32_t recordEnd = recordBegin + length(record.seq);
+                //determine search range
+    //             bool same = true;
+                if(lastContig.compare(recordContig) != 0){
+                    std::cout << "Calc new Range for: \n";
+                    if(!skip)
+                    {
+                        for(int i = st; i < end; ++i)
+                            table.erase(table.begin() + st);
+                    }
+    //                 same = false;
+                    skip = false;
+                    stNew = true;
+                    string rowContig;
+                    for(int i = 0; i < table.size(); ++i){
+                        rowContig = toCString(std::get<0>(table[i]));
+                        if(recordContig.compare(rowContig) == 0 && stNew){
+                            stNew = false;
+                            st = i;
+                        }
+                        if(!stNew && recordContig.compare(rowContig) != 0)
+                        {
+                            end = i;
+                            break;
+                        }
+                    }
+                    
+                    // in case last element matches
+                    if(recordContig.compare(rowContig) == 0)
+                        end = table.size();
+                    
+                    lastContig = recordContig;
+                    std::cout << "Chrom: " << lastContig << "\n";
+                    std::cout << "Start: " << st << "\tEnd: " << end << "\n";
+                    std::cout << "Record: " << k << "\n";
+                    
+                    // in case no element matches
+                    if(stNew){
+                        std::cout << "Skip not in gtf file: " << lastContig << "\n";
+                        skip = true;
+                    }
+
+                }
+                ++k;
+                
+                if(skip){
+                    st = table.size();
+                    end = table.size();
+                    continue;
+                }
+                //TODO assume sorted
+                #pragma omp parallel for num_threads(threads) schedule(static)
+                for(int i = st; i < end; ++i){
+                    //check row
+                    string rowContig = toCString(std::get<0>(table[i]));
+                    uint32_t rowBegin = std::get<1>(table[i]);
+                    uint32_t rowEnd = std::get<2>(table[i]);
+                    
+                    if((recordBegin >= rowBegin && recordBegin <= rowEnd) || (recordEnd >= rowBegin && recordEnd <= rowEnd))
+                    {
+                        //do not take overlapping
+                        if (!overlapping){
+    //                         #pragma omp critical
+                            recordtable[i].push_back(record);
+                            //check overlapping
+                        }else if (recordBegin >= rowBegin || recordEnd <= rowEnd){
+                            if((recordBegin + threshold >= rowBegin && recordBegin <= rowBegin) && (recordEnd <= threshold + rowEnd && recordEnd >= rowEnd)){
+    //                         #pragma omp critical
+                            recordtable[i].push_back(record);
+                            }
+                        }
+                    }
+                    //std::cout << "recordBegin: " << recordBegin << "\t" << recordEnd << "\trow: " << rowBegin << "\t" << rowEnd << "\n";
+                    /*
+                    if((recordBegin >= rowBegin && recordBegin <= rowEnd) || (recordEnd >= rowBegin && recordEnd <= rowEnd)
+                        || (recordBegin + threshold >= rowBegin && recordBegin <= rowBegin) || (recordEnd <= threshold + rowEnd && recordEnd >= rowEnd))
+                    {
+                        //last record did not match sorted coordinates therefore next does not also
+    //                     if(same && st < i)
+    //                         st = i;
+                        recordtable[i].push_back(record);
+                    }*/
+                }
+            }
+            
+            std::cout << "Writing\n";
+            string prefix = toCString(outputPathPrefix);
+    //         #pragma omp parallel for schedule(dynamic) num_threads(threads)
+            for(int b = 0; b < recordtable.size(); b += step)
+            {
+                int cumLength = 0;
+                for(int j = 0; j < step && (b + j) < recordtable.size(); ++j){
+                    cumLength += recordtable[b + j].size();
+                }
+                if(cumLength == 0)
+                    continue;
+                
+                ofstream mybamstream;
+                string bamName = prefix + to_string(b + p) + toCString(suffix) + ".bam";
+                mybamstream.open(bamName);
+                // Open output file, BamFileOut accepts also an ostream and a format tag.
+                BamFileOut bamFileOut(context(bamFileIn), mybamstream, Bam());
+                writeHeader(bamFileOut, header);
+                for(int j = 0; j < step && (b + j) < recordtable.size(); ++j){
+                    for(int i = 0; i < recordtable[b + j].size(); ++i){
+                        BamAlignmentRecord & record = recordtable[b + j][i];
+                        if(rmDup){
+                            auto search = readIDs.find(record.qName);
+                            if(search == readIDs.end()){
+                                writeRecord(bamFileOut, recordtable[b + j][i]);
+                                readIDs[record.qName] = 1;
+                            }
+                            else
+                            {
+                                ++search->second;
+                            }
                         }
                         else
                         {
-                            ++search->second;
+                            writeRecord(bamFileOut, recordtable[b + j][i]);
                         }
                     }
-                    else
-                    {
-                        writeRecord(bamFileOut, recordtable[b + j][i]);
-                    }
                 }
+                close(bamFileOut);
             }
-            close(bamFileOut);
+            p = p + interval;
         }
-    }
-    
-    
-    catch (Exception const & e)
-    {
-        std::cerr << "ERROR: " << e.what() << std::endl;
-        return 1;
+        catch (Exception const & e)
+        {
+            std::cerr << "ERROR: " << e.what() << std::endl;
+            return 1;
+        }
+        close(bamFileIn);
     }
 
     return 0;
