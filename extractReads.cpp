@@ -46,6 +46,8 @@ int main(int argc, char const * argv[])
     addOption(parser, ArgParseOption("ov", "overlapping", "Include Reads that are overlapping the specified region."));
     
     addOption(parser, ArgParseOption("th", "threshold", "Include overlapping reads if they start and end in threshold distance.", ArgParseArgument::INTEGER, "INT"));
+    
+    addOption(parser, ArgParseOption("mi", "min", "Minimum reads to write bam file.", ArgParseArgument::INTEGER, "INT"));
 
     addOption(parser, ArgParseOption("d", "removeDuplicates", "Only inlcude a read into 1 region (random region) even if it occurres in mulitple."));
 /*
@@ -70,6 +72,7 @@ int main(int argc, char const * argv[])
     int threads = 1;
     int step = 1;
     int overlap = 0;
+    int min = 0;
 
     getOptionValue(bamPath, parser, "bam");
     getOptionValue(gtfPath, parser, "gtf");
@@ -77,6 +80,7 @@ int main(int argc, char const * argv[])
     getOptionValue(suffix, parser, "suffix");
     getOptionValue(overlap, parser, "extend");
     getOptionValue(step, parser, "step");
+    getOptionValue(min, parser, "min");
     getOptionValue(interval, parser, "interval");
     getOptionValue(threads, parser, "threads");
     getOptionValue(threshold, parser, "threshold");
@@ -283,7 +287,7 @@ int main(int argc, char const * argv[])
                 for(int j = 0; j < step && (b + j) < recordtable.size(); ++j){
                     cumLength += recordtable[b + j].size();
                 }
-                if(cumLength == 0)
+                if(cumLength <= min)
                     continue;
                 
                 ofstream mybamstream;
