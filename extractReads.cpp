@@ -258,7 +258,7 @@ int main(int argc, char const * argv[])
     //                         #pragma omp critical
                             recordtable[i].push_back(record);
                             //check overlapping
-                        }else if (recordBegin >= rowBegin || recordEnd <= rowEnd){
+                        }else if (recordBegin >= rowBegin && recordEnd <= rowEnd){
                             if((recordBegin + threshold >= rowBegin && recordBegin <= rowBegin) && (recordEnd <= threshold + rowEnd && recordEnd >= rowEnd)){
     //                         #pragma omp critical
                             recordtable[i].push_back(record);
