@@ -63,7 +63,7 @@ int main(int argc, char const * argv[])
     CharString bamPath, gtfPath, outputPathPrefix = "reads", suffix = "";
     int batchSize1 = 100000;
 
-    int interval = 50:00;
+    int interval = 5000;
     int barcode_umi_length = 30;
     int threshold = -1;
     int first = 9999999;
