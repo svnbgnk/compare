@@ -182,6 +182,7 @@ int main(int argc, char const * argv[])
 
     bool start = true;
 
+    int multi = 0;
 
     int y = 0;
     while (!atEnd(bamFileIn))
@@ -206,6 +207,7 @@ int main(int argc, char const * argv[])
             CharString id = record.qName;
 
             if(length(record.seq) == 0){
+                ++multi;
 //                 std::cout << toCString(id) << "\n";
 //                 std::cout << "Read could not be loaded\n";
                 continue;
@@ -341,7 +343,7 @@ int main(int argc, char const * argv[])
     close(seqFileOut);
 
 
-    std::cout << "Finished!\n";
+    std::cout << "Recurring Multimappers: " << multi << "\n";
 
     return 0;
 }
