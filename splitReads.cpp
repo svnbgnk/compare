@@ -23,19 +23,20 @@ int main(int argc, char const * argv[])
 {
     ArgumentParser parser("Search");
 
-    addOption(parser, ArgParseOption("b", "bam", "Path to the bam file", ArgParseArgument::INPUT_FILE, "IN"));
-    setRequired(parser, "bam");
+//     addOption(parser, ArgParseOption("b", "bam", "Path to the bam file", ArgParseArgument::INPUT_FILE, "IN"));
+//     setRequired(parser, "bam");
 
-    addOption(parser, ArgParseOption("f", "foundBarcodes", "Path to the flexbar result", ArgParseArgument::INPUT_FILE, "IN"));
-    setRequired(parser, "foundBarcodes");
+    addOption(parser, ArgParseOption("f", "alignedPrimer", "Path to the flexbar P1 primer alignment result fasta", ArgParseArgument::INPUT_FILE, "IN"));
+    setRequired(parser, "alignedPrimer");
 //     setRequired(parser, "reads1");
 
     addOption(parser, ArgParseOption("o", "output", "Path to output files prefix", ArgParseArgument::OUTPUT_FILE, "OUT"));
-//     setRequired(parser, "output");
+    setRequired(parser, "output");
 
+    addOption(parser, ArgParseOption("c", "checkOrigin", "Check for if Sequence is located on the correct side according to the orientation"));
 //     addOption(parser, ArgParseOption("bL", "barcodeL", "Number of reads with are loaded at the same Time. Default = 100000", ArgParseArgument::INTEGER, "INT"));
 //     setRequired(parser, "barcodeL");
-    addOption(parser, ArgParseOption("bS", "batchSize", "Number of reads with are loaded at the same Time. Default = 100000", ArgParseArgument::INTEGER, "INT"));
+//     addOption(parser, ArgParseOption("bS", "batchSize", "Number of reads with are loaded at the same Time. Default = 100000", ArgParseArgument::INTEGER, "INT"));
 
     addOption(parser, ArgParseOption("v", "verbose", ""));
 
@@ -44,13 +45,14 @@ int main(int argc, char const * argv[])
         return res == ArgumentParser::PARSE_ERROR;
 
     CharString dictPath, flexPath, bamPath, outputPath;
-    int batchSize1 = 100000, barcodeLength;
+    int wrongSide = 0, forward = 0, reverseC = 0;
 
-    getOptionValue(bamPath, parser, "bam");
-    getOptionValue(flexPath, parser, "foundBarcodes");
+//     getOptionValue(bamPath, parser, "bam");
+    getOptionValue(flexPath, parser, "alignedPrimer");
     getOptionValue(outputPath, parser, "output");
 //     getOptionValue(barcodeLength, parser, "barcodeL");
-    getOptionValue(batchSize1, parser, "batchSize");
+//     getOptionValue(batchSize1, parser, "batchSize");
+    bool checkOrigin = isSet(parser, "checkOrigin");
     bool verbose = isSet(parser, "verbose");
 
 
@@ -58,112 +60,63 @@ int main(int argc, char const * argv[])
     //prepare flex result fasta
     StringSet<CharString> idsReads;
     SeqFileIn seqFileInFlex(toCString(flexPath));
+
+
+    CharString outputRevcomp = outputPath;
+    outputPath += "_left_tail_trimmed.fasta";
+    outputRevcomp += "_right_tail_trimmed.fasta";
+
+    SeqFileOut seqFileOut(toCString(outputPath));
+    SeqFileOut seqFileOutRevcomp(toCString(outputRevcomp));
+
+    while (!atEnd(seqFileInFlex))
     {
-        StringSet<Dna5String> reads;
-        readRecords(idsReads, reads, seqFileInFlex);
-    }
-
-    int f = 0;
-    std::map<CharString, bool> umiBarMap;
-    std::cout << "N idsReads " << length(idsReads) << "\n";
-    while(f < length(idsReads)){
-        CharString & id = idsReads[f];
-
-        if(verbose){
-            std::cout << toCString(id) << "\n";
-            std::cout << length(id) << "\n";
-        }
-        Finder<CharString> finder(id);
-        Pattern<CharString, Horspool> pattern("_Flexbar_removal_");
-        find(finder, pattern);
-        int begin = endPosition(finder);
-        std::cout << "begin: " << begin << "\n";
-
-        if(begin > 0){
-            int endName = beginPosition(finder);
-            CharString readName = prefix(id, endName);
-            std::cout << toCString(readName) << "\n";
-            Finder<CharString> finder2(id);
-            Pattern<CharString, Horspool> pattern2(" revcomp");
-            find(finder2, pattern2);
-            int end = beginPosition(finder2);
-            std::cout << "end: " << end << "\n";
-            bool doRC = end > 0;
-
-            umiBarMap[readName] = doRC;
-        }
-        else
-        {
-            umiBarMap[id] = false;
-        }
-        ++f;
-
-
-
-    }
-
-    //prepare Bam
-    BamFileIn bamFileIn;
-    BamHeader header;
-    if (!open(bamFileIn, toCString(bamPath)))
-    {
-        std::cerr << "ERROR: could not open input file " << bamPath << ".\n";
-        return 1;
-    }
-
-    //write Header
-    CharString outputPathReverse = outputPath;
-    outputPath += "_left_tail_trimmed.bam";
-    outputPathReverse += "_right_tail_trimmed.bam";
-    BamFileOut bamFileOut(context(bamFileIn), toCString(outputPath));
-    BamFileOut bamFileOutRevcomp(context(bamFileIn), toCString(outputPathReverse));
-    try
-    {
-        readHeader(header, bamFileIn);
-        writeHeader(bamFileOut, header);
-        writeHeader(bamFileOutRevcomp, header);
-    }
-    catch (IOError const & e)
-    {
-        std::cerr << "ERROR: could not copy header. " << e.what() << "\n";
-    }
-
-    //modify bam (Add UMI and Barcode (determined from flexbar) to each Alignment record)
-    BamAlignmentRecord record;
-    CharString id;
-    Dna5String seq;
-    while (!atEnd(bamFileIn))
-    {
+        Dna5String read;
+        CharString id;
         try
         {
-            readRecord(record, bamFileIn);
-            if(verbose){
-                std::cout << "Accession in Bam " << toCString(record.qName) << "\n";
-            }
 
-            auto search = umiBarMap.find(record.qName);
-            if (search != umiBarMap.end()) {
-                if(verbose)
-                    std::cout << "Found " << search->first << " " << search->second << '\n';
-            } else {
-                std::cout << "Not found\n";
-                std::cout << "Accession from bam file not found in Flexbar result file\n";
-//                 writeRecord(bamFileOut, record);
-//                 continue;
-                exit(0);
-            }
-                //TODO compare accessions
-            //umi and barcode are found
-            if(search->second){
-                if(verbose)
-                    std::cout << "RevComp\n";
-                writeRecord(bamFileOutRevcomp, record);
-            }
-            else
-            {
-                writeRecord(bamFileOut, record);
-            }
+            readRecord(id, read, seqFileInFlex);
 
+            Finder<CharString> finder(id);
+            Pattern<CharString, Horspool> pattern("_Flexbar_removal_");
+            find(finder, pattern);
+            //flexbar aligned primer
+            if(beginPosition(finder) > 0){
+                Finder<CharString> finder2(id);
+                Pattern<CharString, Horspool> pattern(" revcomp");
+                find(finder2, pattern);
+                int end = beginPosition(finder2);
+                bool doRC = end > 0;
+                bool onRightSide;
+                // check If Primer is in correct orientation in regards to aligned cdDNA
+                if(checkOrigin){
+                    Finder<CharString> finder3(id);
+                    Pattern<CharString, Horspool> p_end2("_end2_Flexbar_removal");
+                    find(finder3, p_end2);
+                    int verify = beginPosition(finder3);
+//                     std::cout << toCString(id) << "\n";
+                    if (verbose)
+                        std::cout << "verify begin Positions:" << verify << "\n";
+                    onRightSide = verify > 0;
+                }
+
+                if(checkOrigin && ((doRC && !onRightSide) || (!doRC && onRightSide))){
+                    ++wrongSide;
+                    std::cout << doRC << "\t" << toCString(id) << "\n";
+                }
+                //flexbar aligned to RC Primer
+                else if (doRC){
+                    ++reverseC;
+                    writeRecord(seqFileOutRevcomp, id, read);
+                }
+                //flexbar aligned to forward direction of Primer
+                else
+                {
+                    ++forward;
+                    writeRecord(seqFileOut, id, read);
+                }
+            }
         }
         catch (IOError const & e)
         {
@@ -171,12 +124,20 @@ int main(int argc, char const * argv[])
         }
     }
 
+
     close(seqFileInFlex);
-    close(bamFileOut);
 
 
-    std::cout << "Finished!\n";
-
+    if (checkOrigin){
+        std::cout << "Discarden because aligned to wrong side: " << wrongSide << "\n";
+        std::cout << "Left: " << forward << "\n";
+        std::cout << "Right: " << reverseC << "\n";
+    }
+    else
+    {
+        std::cout << "Left: " << forward << "\n";
+        std::cout << "Right: " << reverseC << "\n";
+    }
     return 0;
 }
 
