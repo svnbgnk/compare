@@ -84,8 +84,9 @@ int main(int argc, char const * argv[])
             Finder<CharString> finder(id);
             Pattern<CharString, Horspool> pattern("_Flexbar_removal_");
             find(finder, pattern);
+            int found = beginPosition(finder);
             //flexbar aligned primer
-            if(beginPosition(finder) > 0){
+            if(found > 0){
                 Finder<CharString> finder2(id);
                 Pattern<CharString, Horspool> pattern("Flexbar_removal_cmdline_rc");
                 find(finder2, pattern);
