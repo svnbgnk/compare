@@ -87,7 +87,7 @@ int main(int argc, char const * argv[])
             //flexbar aligned primer
             if(beginPosition(finder) > 0){
                 Finder<CharString> finder2(id);
-                Pattern<CharString, Horspool> pattern(" revcomp");
+                Pattern<CharString, Horspool> pattern("Flexbar_removal_cmdline_rc");
                 find(finder2, pattern);
                 int end = beginPosition(finder2);
                 bool doRC = end > 0;
@@ -106,7 +106,8 @@ int main(int argc, char const * argv[])
 
                 if(checkOrigin && ((doRC && !onRightSide) || (!doRC && onRightSide))){
                     ++wrongSide;
-                    std::cout << doRC << "\t" << toCString(id) << "\n";
+                    if(verbose)
+                        std::cout << doRC << "\t" << toCString(id) << "\n";
                 }
                 //flexbar aligned to RC Primer
                 else if (doRC){
