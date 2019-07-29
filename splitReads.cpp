@@ -34,9 +34,8 @@ int main(int argc, char const * argv[])
     setRequired(parser, "output");
 
     addOption(parser, ArgParseOption("c", "checkOrigin", "Check for if Sequence is located on the correct side according to the orientation"));
-//     addOption(parser, ArgParseOption("bL", "barcodeL", "Number of reads with are loaded at the same Time. Default = 100000", ArgParseArgument::INTEGER, "INT"));
-//     setRequired(parser, "barcodeL");
-//     addOption(parser, ArgParseOption("bS", "batchSize", "Number of reads with are loaded at the same Time. Default = 100000", ArgParseArgument::INTEGER, "INT"));
+
+    addOption(parser, ArgParseOption("l", "readLength", "Shorten longer reads to this length (remove appropiate suffix)", ArgParseArgument::INTEGER, "INT"));
 
     addOption(parser, ArgParseOption("v", "verbose", ""));
 
@@ -46,11 +45,12 @@ int main(int argc, char const * argv[])
 
     CharString dictPath, flexPath, bamPath, outputPath;
     int wrongSide = 0, forward = 0, reverseC = 0;
+    int readLength = 0;
 
 //     getOptionValue(bamPath, parser, "bam");
     getOptionValue(flexPath, parser, "alignedPrimer");
     getOptionValue(outputPath, parser, "output");
-//     getOptionValue(barcodeLength, parser, "barcodeL");
+    getOptionValue(readLength, parser, "readLength");
 //     getOptionValue(batchSize1, parser, "batchSize");
     bool checkOrigin = isSet(parser, "checkOrigin");
     bool verbose = isSet(parser, "verbose");
@@ -77,6 +77,9 @@ int main(int argc, char const * argv[])
         {
 
             readRecord(id, read, seqFileInFlex);
+            if(readLength > 0 && length(read) > readLength){
+                read = prefix(read, readLength);
+            }
 
             Finder<CharString> finder(id);
             Pattern<CharString, Horspool> pattern("_Flexbar_removal_");
