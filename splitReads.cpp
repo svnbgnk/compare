@@ -77,9 +77,6 @@ int main(int argc, char const * argv[])
         {
 
             readRecord(id, read, seqFileInFlex);
-            if(readLength > 0 && length(read) > readLength){
-                read = prefix(read, readLength);
-            }
 
             Finder<CharString> finder(id);
             Pattern<CharString, Horspool> pattern("_Flexbar_removal_");
@@ -112,12 +109,16 @@ int main(int argc, char const * argv[])
                 }
                 //flexbar aligned to RC Primer
                 else if (doRC){
+                    if(readLength > 0 && length(read) > readLength)
+                        read = suffix(read, length(read) - readLength);
                     ++reverseC;
                     writeRecord(seqFileOutRevcomp, id, read);
                 }
                 //flexbar aligned to forward direction of Primer
                 else
                 {
+                    if(readLength > 0 && length(read) > readLength)
+                        read = prefix(read, readLength);
                     ++forward;
                     writeRecord(seqFileOut, id, read);
                 }
